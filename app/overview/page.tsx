@@ -66,7 +66,8 @@ type LogRow = {
   sabakDhorMistakes?: string;
   dhorMistakes?: string;
 
-  // weekly goal meta (admin saves these)
+  notes?: string; // ✅ ADD THIS
+
   weeklyGoalStartDateKey?: string;
   weeklyGoalCompletedDateKey?: string;
   weeklyGoalDurationDays?: number | string;
@@ -252,6 +253,9 @@ export default function OverviewPage() {
                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
                         Read
                       </th>
+                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
+                        Notes
+                      </th>
 
                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
                         Sabak Dhor
@@ -259,12 +263,18 @@ export default function OverviewPage() {
                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
                         Read
                       </th>
+                      <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
+                        Notes
+                      </th>
 
                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
                         Dhor
                       </th>
                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
                         Read
+                      </th>
+                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
+                        Notes
                       </th>
 
                       <th className="sticky top-0 bg-white/60 backdrop-blur pb-3 px-4 border-b border-gray-200 border-l border-gray-100">
@@ -318,7 +328,7 @@ export default function OverviewPage() {
   {showMonthHeader && (
     <tr>
       <td
-        colSpan={13}
+        colSpan={16}
         className="bg-gradient-to-r from-[#9c7c38]/15 to-transparent text-sm font-semibold text-gray-900 py-4 px-4 uppercase tracking-wider"
       >
         {currentMonth}
@@ -340,6 +350,9 @@ export default function OverviewPage() {
                           <td className="py-4 px-4 text-gray-700 border-l border-gray-100">
                             {toText(r.sabakRead) || "—"}
                           </td>
+                         <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
+  {toText(r.notes) || "—"}
+</td>
 
                           <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
                             {toText(r.sabakDhor) || "—"}
@@ -347,6 +360,9 @@ export default function OverviewPage() {
                           <td className="py-4 px-4 text-gray-700 border-l border-gray-100">
                             {toText(r.sabakDhorRead) || "—"}
                           </td>
+                          <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
+  {toText(r.notes) || "—"}
+</td>
 
                           <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
                             {toText(r.dhor) || "—"}
@@ -354,6 +370,9 @@ export default function OverviewPage() {
                           <td className="py-4 px-4 text-gray-700 border-l border-gray-100">
                             {toText(r.dhorRead) || "—"}
                           </td>
+                          <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
+  {toText(r.notes) || "—"}
+</td>
 
                           <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
                             {toText(r.sabakDhorMistakes) || "—"}
