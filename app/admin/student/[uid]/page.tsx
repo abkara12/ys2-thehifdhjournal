@@ -154,6 +154,9 @@ export default function AdminStudentPage() {
   const params = useParams<{ uid: string }>();
   const studentUid = params.uid;
 
+
+  const [attendance, setAttendance] = useState<"present" | "absent">("present");
+
   const [me, setMe] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -214,11 +217,17 @@ const [studentName, setStudentName] = useState("");
   const currentWeekKey = useMemo(() => isoWeekKeyFromDateKey(dateKey), [dateKey]);
 
   // weekly goal can be set only once per week
-  const goalLockedThisWeek =
-    weeklyGoal.trim().length > 0 && weeklyGoalWeekKey === currentWeekKey;
+  const goalLocked =
+  weeklyGoal.trim().length > 0 && !weeklyGoalCompletedDateKey;
 
   const goalAlreadyCompleted =
     Boolean(weeklyGoalCompletedDateKey) || (weeklyGoalDurationDays ?? 0) > 0;
+
+      const goalNotReached =
+  weeklyGoal &&
+  weeklyGoalStartDateKey &&
+  !weeklyGoalCompletedDateKey &&
+  diffDaysInclusive(weeklyGoalStartDateKey, dateKey) > 7;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -314,14 +323,19 @@ async function handleSave(e: React.FormEvent) {
     let nextDuration: number | null = weeklyGoalDurationDays ?? null;
 
     if (nextGoal) {
-      const isNewWeekGoal = !nextWeekKey || nextWeekKey !== currentWeekKey;
-      if (isNewWeekGoal) {
-        nextWeekKey = currentWeekKey;
-        nextStartKey = dateKey;
-        nextCompletedKey = "";
-        nextDuration = null;
-        setMarkGoalCompleted(false);
-      }
+     // Only set goal if none exists OR previous is completed
+const canSetNewGoal = !nextGoal || nextCompletedKey;
+
+if (nextGoal && !nextStartKey) {
+  // First time goal is set
+  nextStartKey = dateKey;
+}
+
+if (markGoalCompleted && !nextCompletedKey) {
+  const startKey = nextStartKey || dateKey;
+  nextCompletedKey = dateKey;
+  nextDuration = diffDaysInclusive(startKey, dateKey);
+}
 
       if (markGoalCompleted && !nextCompletedKey) {
         const startKey = nextStartKey || dateKey;
@@ -336,6 +350,8 @@ async function handleSave(e: React.FormEvent) {
       {
         dateKey,
         createdAt: serverTimestamp(),
+
+        attendance,
 
         // Daily fields
         sabak,
@@ -499,25 +515,54 @@ async function handleSave(e: React.FormEvent) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {weeklyGoal ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white/70 px-3 py-1.5 text-xs font-semibold text-gray-700">
-                Goal: {weeklyGoalWeekKey || currentWeekKey}
-              </span>
-            ) : null}
-
             {goalAlreadyCompleted ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                Completed in {weeklyGoalDurationDays ?? "—"} day(s)
-              </span>
-            ) : weeklyGoal ? (
-              <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
-                In progress
-              </span>
-            ) : null}
+  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+    Completed in {weeklyGoalDurationDays ?? "—"} day(s)
+  </span>
+) : goalNotReached ? (
+  <span className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700">
+    Not reached
+  </span>
+) : weeklyGoal ? (
+  <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+    In progress
+  </span>
+) : null}
           </div>
         </div>
 
         <form onSubmit={handleSave} className="mt-6 grid gap-5">
+
+        {/* Attendance */}
+<div className="rounded-3xl border border-gray-300 bg-white/70 backdrop-blur-xl p-5 sm:p-6">
+  <div className="text-sm font-semibold text-gray-900">Attendance</div>
+
+  <div className="mt-4 flex gap-3">
+    <button
+      type="button"
+      onClick={() => setAttendance("present")}
+      className={`px-4 py-2 rounded-xl border ${
+        attendance === "present"
+          ? "bg-emerald-100 border-emerald-400 text-emerald-700"
+          : "bg-white border-gray-300"
+      }`}
+    >
+      Present
+    </button>
+
+    <button
+      type="button"
+      onClick={() => setAttendance("absent")}
+      className={`px-4 py-2 rounded-xl border ${
+        attendance === "absent"
+          ? "bg-red-100 border-red-400 text-red-700"
+          : "bg-white border-gray-300"
+      }`}
+    >
+      Absent
+    </button>
+  </div>
+</div>
           {/* Sabak */}
           <div className="rounded-3xl border border-gray-300 bg-white/70 backdrop-blur-xl p-5 sm:p-6">
             <div className="text-sm font-semibold text-gray-900">Sabak</div>
@@ -636,14 +681,14 @@ async function handleSave(e: React.FormEvent) {
                 <div className="flex items-end justify-between gap-4">
                   <span className="text-sm font-semibold text-gray-900">Weekly Sabak Goal</span>
                   <span className="text-xs text-gray-500">
-                    {goalLockedThisWeek ? "Locked (already set this week)" : "Set it now"}
+                    {goalLocked ? "Locked until completed" : "Set a new goal"}
                   </span>
                 </div>
 
                 <input
-                  value={weeklyGoal}
-                  onChange={(e) => setWeeklyGoal(e.target.value)}
-                  disabled={goalLockedThisWeek}
+                    value={weeklyGoal}
+  onChange={(e) => setWeeklyGoal(e.target.value)}
+  disabled={goalLocked}
                   className="h-12 rounded-2xl border border-gray-300 bg-white/80 px-4 outline-none focus:ring-2 focus:ring-[#B8963D]/30 disabled:opacity-60"
                   placeholder="Example: 10 pages"
                 />

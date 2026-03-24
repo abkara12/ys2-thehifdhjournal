@@ -64,6 +64,8 @@ type LogRow = {
   id: string;
   dateKey?: string;
 
+  attendance?: string;
+
   sabak?: string;
   sabakRead?: string;
   sabakReadNotes?: string;
@@ -161,14 +163,42 @@ setStudentName(
     }
   }, [studentUid]);
 
+  const absentsByMonth = useMemo(() => {
+    
+  const map: Record<string, number> = {};
+
+  rows.forEach((r) => {
+    if (r.attendance !== "absent") return;
+
+    const month = getMonthLabel(r.dateKey);
+    if (!month) return;
+
+    map[month] = (map[month] || 0) + 1;
+  });
+
+  return map;
+}, [rows]);
+
+const currentMonth = getMonthLabel(new Date().toISOString().slice(0, 10));
+
+const currentMonthAbsents = absentsByMonth[currentMonth] || 0;
+
   const summary = useMemo(() => {
-    if (!rows.length) return { totalDays: 0, avgSabak: 0, lastGoal: 0 };
-    const sabakNums = rows.map((r) => num(r.sabak)).filter((n) => n > 0);
-    const avgSabak =
-      sabakNums.length ? sabakNums.reduce((a, b) => a + b, 0) / sabakNums.length : 0;
-    const lastGoal = num(rows[0]?.weeklyGoal);
-    return { totalDays: rows.length, avgSabak, lastGoal };
-  }, [rows]);
+  if (!rows.length) return { totalDays: 0, avgSabakLines: 0, avgPresentLines: 0, lastGoal: 0 };
+
+  // Total lines including all days (0 sabak counts)
+  const totalLines = rows.reduce((sum, r) => sum + num(r.sabak) * 13, 0);
+  const avgSabakLines = totalLines / rows.length;
+
+  // Only present days
+  const presentRows = rows.filter((r) => r.attendance === "present");
+  const totalPresentLines = presentRows.reduce((sum, r) => sum + num(r.sabak) * 13, 0);
+  const avgPresentLines = presentRows.length ? totalPresentLines / presentRows.length : 0;
+
+  const lastGoal = num(rows[0]?.weeklyGoal);
+
+  return { totalDays: rows.length, avgSabakLines, avgPresentLines, lastGoal };
+}, [rows]);
 
   if (checking) {
     return (
@@ -275,10 +305,31 @@ setStudentName(
 
       <section className="max-w-6xl mx-auto px-6 sm:px-10 pb-16">
         {/* Summary cards */}
-        <div className="grid sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid sm:grid-cols-4 gap-4 mb-8">
           <StatCard label="Days logged" value={String(summary.totalDays)} />
-          <StatCard label="Average Sabak" value={summary.avgSabak ? summary.avgSabak.toFixed(1) : "—"} />
-          <StatCard label="Latest weekly goal" value={summary.lastGoal ? String(summary.lastGoal) : "—"} />
+                    <StatCard
+            label="Absences (this month)"
+            value={String(currentMonthAbsents)}
+          />
+<StatCard
+  label="Average Sabak"
+  value={
+    summary.avgSabakLines
+      ? `${summary.avgSabakLines.toFixed(1)} lines/day`
+      : "—"
+  }
+/>          <StatCard label="Latest weekly goal" value={summary.lastGoal ? String(summary.lastGoal) : "—"} />
+        </div>
+
+                <div className="mb-6 flex flex-wrap gap-3">
+          {Object.entries(absentsByMonth).map(([month, count]) => (
+            <div
+              key={month}
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700"
+            >
+              {month}: {count} absent day(s)
+            </div>
+          ))}
         </div>
 
         <div className="rounded-3xl border border-gray-300 bg-white/70 backdrop-blur shadow-sm overflow-hidden">
@@ -321,6 +372,9 @@ setStudentName(
                       </th>
                       <th className="sticky top-0 bg-white/70 backdrop-blur-xl backdrop-blur pb-3 pr-4 pl-2 border-b border-gray-300">
                         Date
+                      </th>
+                       <th className="sticky top-0 bg-white/70 backdrop-blur-xl backdrop-blur pb-3 pr-4 pl-2 border-b border-gray-300">
+                        Attendance
                       </th>
 
                       <th className="sticky top-0 bg-white/70 backdrop-blur-xl backdrop-blur pb-3 px-4 border-b border-gray-300 border-l border-gray-100">
@@ -395,7 +449,12 @@ setStudentName(
                         startKey && completedKey ? diffDaysInclusive(startKey, completedKey) : null;
 
                       const duration = storedDur ?? calcDur;
-                      const completed = Boolean(completedKey) || (duration ?? 0) > 0;
+                      const notReached =
+                      startKey &&
+                      !completedKey &&
+                      diffDaysInclusive(startKey, r.dateKey || "") > 7;
+
+                    const completed = Boolean(completedKey);
 
                       return (
                           <>
@@ -416,6 +475,16 @@ setStudentName(
                         </td>
                           <td className="py-4 pr-4 pl-2 font-medium text-gray-900">
                             {r.dateKey ?? r.id}
+                          </td>
+
+                            <td className="py-4 px-4 border-l border-gray-100">
+                            {r.attendance === "present" ? (
+                              <span className="text-emerald-600 font-semibold">Present</span>
+                            ) : r.attendance === "absent" ? (
+                              <span className="text-red-600 font-semibold">Absent</span>
+                            ) : (
+                              "—"
+                            )}
                           </td>
 
                           <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
@@ -465,20 +534,30 @@ setStudentName(
                                 className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border ${
                                   completed
                                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                    : notReached
+                                    ? "border-red-200 bg-red-50 text-red-700"
                                     : "border-amber-200 bg-amber-50 text-amber-700"
                                 }`}
                               >
                                 <span
                                   className={`h-2 w-2 rounded-full ${
-                                    completed ? "bg-emerald-500" : "bg-amber-500"
+                                    completed
+                                      ? "bg-emerald-500"
+                                      : notReached
+                                      ? "bg-red-500"
+                                      : "bg-amber-500"
                                   }`}
                                 />
-                                {completed ? "Completed" : "In progress"}
+                                {completed
+                                  ? "Completed"
+                                  : notReached
+                                  ? "Not reached"
+                                  : "In progress"}
                               </span>
                             ) : (
                               <span className="text-xs text-gray-500">No goal set</span>
                             )}
-                          </td>
+</td>
 
                           <td className="py-4 px-4 text-gray-800 border-l border-gray-100">
                             {duration ? `${duration} day(s)` : "—"}
