@@ -217,11 +217,15 @@ const [studentName, setStudentName] = useState("");
   const currentWeekKey = useMemo(() => isoWeekKeyFromDateKey(dateKey), [dateKey]);
 
   // weekly goal can be set only once per week
-  const goalLocked =
-  weeklyGoal.trim().length > 0 && !weeklyGoalCompletedDateKey;
+const goalLocked =
+  weeklyGoal.trim().length > 0 &&
+  weeklyGoalWeekKey === currentWeekKey &&
+  !weeklyGoalCompletedDateKey;
 
   const goalAlreadyCompleted =
     Boolean(weeklyGoalCompletedDateKey) || (weeklyGoalDurationDays ?? 0) > 0;
+
+    
 
       const goalNotReached =
   weeklyGoal &&
@@ -323,26 +327,27 @@ async function handleSave(e: React.FormEvent) {
     let nextDuration: number | null = weeklyGoalDurationDays ?? null;
 
     if (nextGoal) {
-     // Only set goal if none exists OR previous is completed
-const canSetNewGoal = !nextGoal || nextCompletedKey;
+  // FIRST TIME setting goal
+  if (!nextStartKey) {
+    nextStartKey = dateKey;
+    nextWeekKey = currentWeekKey;
+  }
 
-if (nextGoal && !nextStartKey) {
-  // First time goal is set
+  // ✅ Mark completed
+  if (markGoalCompleted && !nextCompletedKey) {
+    nextCompletedKey = dateKey;
+    nextDuration = diffDaysInclusive(nextStartKey, dateKey);
+  }
+
+  // ✅ Allow NEW goal AFTER completion
+  // If goal was completed BEFORE and user is typing a NEW goal → reset
+if (nextCompletedKey && weeklyGoal.trim() !== "" && !markGoalCompleted) {
   nextStartKey = dateKey;
+  nextCompletedKey = "";
+  nextDuration = null;
+  nextWeekKey = currentWeekKey;
 }
-
-if (markGoalCompleted && !nextCompletedKey) {
-  const startKey = nextStartKey || dateKey;
-  nextCompletedKey = dateKey;
-  nextDuration = diffDaysInclusive(startKey, dateKey);
 }
-
-      if (markGoalCompleted && !nextCompletedKey) {
-        const startKey = nextStartKey || dateKey;
-        nextCompletedKey = dateKey;
-        nextDuration = diffDaysInclusive(startKey, dateKey); // ✅ call the function, don’t pass it
-      }
-    }
 
     // ---- 1) Save daily log ----
     await setDoc(
@@ -662,10 +667,10 @@ if (markGoalCompleted && !nextCompletedKey) {
           </div>
 
           {/* Weekly goal block */}
-          <div className="rounded-3xl border border-gray-300 bg-white/70 p-5 sm:p-6">
+         <div className="rounded-3xl border border-gray-200 bg-white/70 p-5 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-gray-900">Weekly Goal</div>
+                <div className="text-sm font-semibold text-[#5B726D]">Weekly Goal</div>
                 <div className="mt-1 text-sm text-gray-700">
                   Set once per week. When finished, tick “Completed” to calculate duration.
                 </div>
@@ -685,13 +690,16 @@ if (markGoalCompleted && !nextCompletedKey) {
                   </span>
                 </div>
 
-                <input
-                    value={weeklyGoal}
-  onChange={(e) => setWeeklyGoal(e.target.value)}
-  disabled={goalLocked}
-                  className="h-12 rounded-2xl border border-gray-300 bg-white/80 px-4 outline-none focus:ring-2 focus:ring-[#B8963D]/30 disabled:opacity-60"
+                 <input
+                  value={weeklyGoal}
+                  onChange={(e) => setWeeklyGoal(e.target.value)}
+                  disabled={goalLocked}
+                  className="h-12 rounded-2xl border border-gray-200 bg-white/80 px-4 outline-none focus:ring-2 focus:ring-[#A46B72]/30 disabled:opacity-60"
                   placeholder="Example: 10 pages"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                After typing a new goal, press <span className="font-semibold">Enter</span> or click Save to activate it.
+              </p>
               </label>
 
               <div className="grid gap-2 sm:grid-cols-3">
@@ -714,7 +722,7 @@ if (markGoalCompleted && !nextCompletedKey) {
                 <input
                   type="checkbox"
                   checked={goalAlreadyCompleted ? true : markGoalCompleted}
-                  disabled={goalAlreadyCompleted || !weeklyGoal.trim()}
+                  disabled={!weeklyGoal.trim() || goalAlreadyCompleted}
                   onChange={(e) => setMarkGoalCompleted(e.target.checked)}
                   className="h-6 w-6 accent-black disabled:opacity-50"
                 />
